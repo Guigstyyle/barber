@@ -6,12 +6,6 @@
 #include <random>
 
 using namespace std;
-#include <iostream>
-#include <mutex>
-#include <semaphore>
-#include <thread>
-#include <vector>
-#include <random>
 
 
 int n = 20; // Nombre de places disponibles
@@ -35,8 +29,13 @@ counting_semaphore<1> customerPaySem(0);
 counting_semaphore<1> barberPaySem(0);
 counting_semaphore<1> paymentDone(0);
 
-vector<thread> vecClientsSofa(4);
-vector<thread> vecClientDebout(16);
+
+mutex sofaMut;
+vector<thread::id> vecClientsSofa(4);
+
+
+mutex deboutMut;
+vector<thread::id> vecClientDebout(16);
 
 
 void balk(const string & nom)
@@ -68,16 +67,24 @@ void customer(const string & nom)
 {
 
 
+
     nbCustomerMut.lock();   //demande nbCustomer
+
 
     cout << nom << " enters the barbershop." << endl;
     if (nbCustomer == n)
     {
         nbCustomerMut.unlock();     //libere nbCustomer
+
         balk(nom);
         return;
 
     }
+    //Debut list clients debouts ( C'EST PAS FINI )
+    deboutMut.lock();
+
+    vecClientDebout.push_back(this_thread::get_id());
+    deboutMut.unlock();
 
 
     ++nbCustomer;
