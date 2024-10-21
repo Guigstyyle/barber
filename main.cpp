@@ -5,8 +5,13 @@
 #include <vector>
 #include <random>
 
-
 using namespace std;
+#include <iostream>
+#include <mutex>
+#include <semaphore>
+#include <thread>
+#include <vector>
+#include <random>
 
 
 int n = 20; // Nombre de places disponibles
@@ -28,6 +33,11 @@ counting_semaphore<1> barberDone(0);
 
 counting_semaphore<1> customerPaySem(0);
 counting_semaphore<1> barberPaySem(0);
+counting_semaphore<1> paymentDone(0);
+
+vector<thread> vecClientsSofa(4);
+vector<thread> vecClientDebout(16);
+
 
 void balk(const string & nom)
 {
@@ -75,7 +85,7 @@ void customer(const string & nom)
     nbCustomerMut.unlock();     //libere nbCustomer
 
     cout << nom << " is waiting to sit on the sofa." << endl;
-    sofaSem.aquire(); //Attend une place sur le sofa
+    sofaSem.acquire(); //Attend une place sur le sofa
 
     cout << nom << " is sitting on the sofa, waiting for a barber." << endl;
 
@@ -90,14 +100,11 @@ void customer(const string & nom)
 
 
     customerPaySem.release(); // Va a la caisse
-    barberPaySem.aquire(); //Attend un barber
+    barberPaySem.acquire(); //Attend un barber
 
     pay(nom); //Le client paye
 
-     //Libere la caisse
-    //Libere le barber
-
-
+    paymentDone.acquire(); //Attend que le paiement soit validé
 
     //Le client s'en va
 
@@ -131,6 +138,7 @@ void barber(const string & barberNom)
         barberDone.release();
         ++haricutGiven;
 
+        barberPaySem.release();
         customerPaySem.acquire(); //Attend le client a la caisse
         registerMut.lock(); // Le barbeur réserve la caisse
 
@@ -139,8 +147,7 @@ void barber(const string & barberNom)
         acceptPayment(barberNom); // Le barbeur accepte le paiement
 
         registerMut.unlock(); // Le barbeur libere la caisse
-        customerPaySem.release(); // Le client s'en va
-
+        paymentDone.release(); // Le barbeur signale que le paiement est fait
 
         cout << barberNom <<" is ready" << endl;
 
