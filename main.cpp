@@ -26,8 +26,8 @@ counting_semaphore<1> barberSem(0);
 counting_semaphore<1> customerDone(0);
 counting_semaphore<1> barberDone(0);
 
-counting_semaphore<1> customerPaySem(1);
-counting_semaphore<1> barberPaySem(1);
+counting_semaphore<1> customerPaySem(0);
+counting_semaphore<1> barberPaySem(0);
 
 void balk(const string & nom)
 {
@@ -43,6 +43,17 @@ void cutHair(const string & barberNom)
 {
     cout << barberNom << " is cutting hair." << endl;
 }
+
+void pay(const string & nom)
+{
+    cout << nom << " pays." << endl;
+}
+
+void acceptPayment(const string & barberNom)
+{
+    cout << barberNom << " accepts the payment." << endl;
+}
+
 void customer(const string & nom)
 {
 
@@ -68,10 +79,9 @@ void customer(const string & nom)
 
     cout << nom << " is sitting on the sofa, waiting for a barber." << endl;
 
-
-
     customerSem.release();
     barberSem.acquire();
+    sofaSem.release(); //Libere une place sur le sofa
 
     getHairCut(nom);
 
@@ -80,11 +90,11 @@ void customer(const string & nom)
 
 
     customerPaySem.release(); // Va a la caisse
-    //Attend un barber
+    barberPaySem.aquire(); //Attend un barber
 
-    //Paye
+    pay(nom); //Le client paye
 
-    //Libere la caisse
+     //Libere la caisse
     //Libere le barber
 
 
@@ -121,15 +131,15 @@ void barber(const string & barberNom)
         barberDone.release();
         ++haricutGiven;
 
-        if (customerPaySem.try_acquire()) //Check si un client est a la caisse
-        {
-            if (registerMut.try_lock()) //Check si un barber n'encaisse pas deja
-            {
-                // Si oui il encaise le paiement
-                registerMut.unlock();
-            }
-            customerPaySem.release(); 
-        }
+        customerPaySem.acquire(); //Attend le client a la caisse
+        registerMut.lock(); // Le barbeur réserve la caisse
+
+        // le client paye
+
+        acceptPayment(barberNom); // Le barbeur accepte le paiement
+
+        registerMut.unlock(); // Le barbeur libere la caisse
+        customerPaySem.release(); // Le client s'en va
 
 
         cout << barberNom <<" is ready" << endl;
