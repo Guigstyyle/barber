@@ -9,7 +9,7 @@
 using namespace std;
 
 
-int n = 12; // Nombre de places disponibles
+int n = 20; // Nombre de places disponibles
 
 
 mutex nbCustomerMut;
@@ -18,6 +18,7 @@ int nbBarbers = 3;
 
 mutex registerMut;
 
+counting_semaphore<4> sofaSem(4);
 
 counting_semaphore<1> customerSem(0);
 counting_semaphore<1> barberSem(0);
@@ -59,9 +60,15 @@ void customer(const string & nom)
 
 
     ++nbCustomer;
+
     nbCustomerMut.unlock();     //libere nbCustomer
 
-    cout << nom << " is wating for the barber" << endl;
+    cout << nom << " is waiting to sit on the sofa." << endl;
+    sofaSem.aquire(); //Attend une place sur le sofa
+
+    cout << nom << " is sitting on the sofa, waiting for a barber." << endl;
+
+
 
     customerSem.release();
     barberSem.acquire();
