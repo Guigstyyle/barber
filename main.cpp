@@ -31,11 +31,12 @@ counting_semaphore<1> paymentDone(0);
 
 
 mutex sofaMut;
-vector<thread::id> vecClientsSofa(4);
+vector<thread::id> vecClientsSofa(0);
 
 
 mutex deboutMut;
-vector<thread::id> vecClientDebout(16);
+vector<thread::id> vecClientDebout(0);
+
 
 
 void balk(const string & nom)
@@ -65,6 +66,7 @@ void acceptPayment(const string & barberNom)
 
 void customer(const string & nom)
 {
+    thread::id tId = this_thread::get_id();
 
 
 
@@ -83,7 +85,8 @@ void customer(const string & nom)
     //Debut list clients debouts ( C'EST PAS FINI )
     deboutMut.lock();
 
-    vecClientDebout.push_back(this_thread::get_id());
+
+    vecClientDebout.push_back(tId);
     deboutMut.unlock();
 
 
@@ -91,19 +94,52 @@ void customer(const string & nom)
 
     nbCustomerMut.unlock();     //libere nbCustomer
 
+
+    cout << "AHHHH"<<endl;
+    cout << vecClientDebout.at(0)<<endl;
+    cout << this_thread::get_id()<<endl;
+    cout << "AHHHH"<<endl;
+    while (true) {
+        lock_guard<mutex> lock(deboutMut); // Protection du vecteur lors de la vérification
+        if (vecClientDebout.front() == this_thread::get_id()) {
+            break; // Si ce thread est le premier, on peut sortir de la boucle
+        }
+    }
+
+    deboutMut.lock();
+    vecClientDebout.erase(vecClientDebout.begin());
+    sofaSem.acquire();
+    vecClientsSofa.push_back(this_thread::get_id());
+    deboutMut.unlock();
+
+
+
+
     cout << nom << " is waiting to sit on the sofa." << endl;
-    sofaSem.acquire(); //Attend une place sur le sofa
 
     cout << nom << " is sitting on the sofa, waiting for a barber." << endl;
 
     customerSem.release();
     barberSem.acquire();
+
+    sofaMut.lock();
+//    while (vecClientSofa.front() != this_thread::get_id()) {
+//
+//        this_thread::sleep_for(chrono::milliseconds(50));
+//    }
+
+    vecClientsSofa.erase(vecClientsSofa.begin());
     sofaSem.release(); //Libere une place sur le sofa
+    sofaMut.unlock();
+
 
     getHairCut(nom);
 
     customerDone.release();
     barberDone.acquire();
+
+
+
 
 
     customerPaySem.release(); // Va a la caisse
@@ -116,8 +152,15 @@ void customer(const string & nom)
     //Le client s'en va
 
     nbCustomerMut.lock();   //demande nbCustomer
+
+
+
+
+
     --nbCustomer;           //décrémente nbCustomer
+
     nbCustomerMut.unlock(); //libere nbCustomer
+
 
 }
 
@@ -169,7 +212,7 @@ void barber(const string & barberNom)
 
 int main()
 {
-    unsigned customerWave = 500;
+    unsigned customerWave = 200;
 
     vector<thread> vecThreadBarbers(nbBarbers);
     vector<thread> vecThreadCustomers(customerWave);
@@ -187,7 +230,6 @@ int main()
 
         vecThreadCustomers.at(i) = thread(customer, "Client " + to_string(i));
     }
-
 
     //On join tous les threads client
     for (int i = 0; i < vecThreadCustomers.size(); ++i) {
